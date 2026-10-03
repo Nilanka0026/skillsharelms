@@ -1,0 +1,221 @@
+import { useEffect, useState } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { CheckCircle2, Star, BookOpen, Users, Award } from 'lucide-react';
+import { CourseCard } from '../../components/common/CourseCard.jsx';
+import { ReviewCard } from '../../components/common/ReviewCard.jsx';
+import { courses } from '../../data/platformData.js';
+import { courseApi } from '../../services/api.js';
+import { formatCurrency } from '../../utils/formatters.js';
+import { useCourse } from '../../context/CourseContext.jsx';
+import { useAuth } from '../../context/useAuth.js';
+
+export function CourseDetails() {
+  const { courseId } = useParams();
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+  const { myCourses, enrollInCourse, fetchMyCourses } = useCourse();
+
+  const fallbackCourse = courses.find((item) => item.id === courseId) || courses[0];
+  const [apiPayload, setApiPayload] = useState(null);
+  const [apiError, setApiError] = useState('');
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollError, setEnrollError] = useState('');
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    courseApi.details(courseId)
+      .then((data) => setApiPayload(data))
+      .catch((error) => setApiError(error.message));
+  }, [courseId]);
+
+  // Proactively fetch student courses list if logged in to sync enrollment status
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'student') {
+      fetchMyCourses().catch(() => {});
+    }
+  }, [isAuthenticated, user, fetchMyCourses]);
+
+  const course = apiPayload?.course || fallbackCourse;
+  const reviews = apiPayload?.reviews || [];
+  const courseIdForLinks = course._id || course.id;
+  const instructorName = typeof course.instructor === 'object' ? course.instructor?.name : course.instructor;
+  const lessonItems = course.lessons?.length ? course.lessons : fallbackCourse.lessons;
+  const rating = typeof course.ratings === 'object' ? course.ratings?.average || 0 : course.rating;
+  const reviewCount = typeof course.ratings === 'object' ? course.ratings?.count || reviews.length : course.reviews;
+  const studentCount = course.students || course.studentsEnrolled?.length || course.enrollmentCount || 0;
+  const thumbnail = course.thumbnail || course.image;
+  const relatedCourses = courses.filter((item) => item.id !== fallbackCourse.id).slice(0, 3);
+
+  const isEnrolled = myCourses.some((item) => (item._id || item.id) === courseIdForLinks);
+
+  const handleEnrollment = async () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    if (user?.role !== 'student') {
+      setEnrollError('Only students can enroll in courses.');
+      return;
+    }
+
+    // IF PAID COURSE: Go to checkout / payment process
+    if (course.price > 0) {
+      navigate(`/checkout/${courseIdForLinks}`);
+      return;
+    }
+
+    // IF FREE COURSE: Enroll immediately!
+    setEnrolling(true);
+    setEnrollError('');
+
+    try {
+      await enrollInCourse(courseIdForLinks);
+      navigate(`/dashboard/student/learning/${courseIdForLinks}`);
+    } catch (err) {
+      setEnrollError(err.message || 'Enrollment failed. Please try again.');
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  return (
+    <section className="bg-white">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
+          <div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">{course.category}</span>
+            <h1 className="mt-5 text-4xl font-black text-gray-950">{course.title}</h1>
+            <p className="mt-4 text-lg leading-8 text-gray-600">{course.description}</p>
+            {apiError && <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">Backend detail unavailable: {apiError}. Showing mock detail.</p>}
+            <div className="mt-5 flex flex-wrap gap-4 text-sm text-gray-600">
+              <span className="flex items-center gap-1.5"><Star size={16} className="text-amber-500 fill-amber-500" /> {rating || 'New'} ({reviewCount || 0} reviews)</span>
+              <span>{studentCount.toLocaleString()} students</span>
+              <span>{course.level || 'All levels'}</span>
+              <span>{course.duration || 'Self-paced'}</span>
+            </div>
+
+            <div className="mt-10">
+              <h2 className="text-2xl font-black text-gray-950">Lessons List</h2>
+              <div className="mt-4 grid gap-3">
+                {lessonItems.map((lesson, index) => (
+                  <div key={lesson._id || lesson.title || lesson} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4">
+                    <span className="flex items-center gap-3 font-semibold text-gray-800"><CheckCircle2 size={18} className="text-blue-600" /> {index + 1}. {lesson.title || lesson}</span>
+                    <span className="text-sm text-gray-500">{lesson.duration || `${12 + index * 8} min`}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Teacher Biography Section */}
+            <div className="mt-10 rounded-2xl border border-gray-200 bg-gray-50 p-6">
+              <h2 className="text-2xl font-black text-gray-950 mb-4">About the Teacher</h2>
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                <div className="grid h-16 w-16 place-items-center rounded-2xl bg-blue-600 text-xl font-black text-white">
+                  {typeof course.instructor === 'object' && course.instructor?.profileImage ? (
+                    <img
+                      src={course.instructor.profileImage}
+                      alt={instructorName}
+                      className="h-full w-full rounded-2xl object-cover"
+                    />
+                  ) : (
+                    (instructorName || 'T')[0]
+                  )}
+                </div>
+                <div>
+                  <Link
+                    to={`/teachers/${typeof course.instructor === 'object' ? course.instructor?._id : course.instructor}`}
+                    className="text-lg font-black text-blue-600 hover:underline"
+                  >
+                    {instructorName || 'SkillShare Instructor'}
+                  </Link>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mt-0.5">
+                    {typeof course.instructor === 'object' && course.instructor?.experience ? course.instructor.experience : 'Expert Educator'}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-gray-600">
+                {typeof course.instructor === 'object' && course.instructor?.bio ? course.instructor.bio : 'This instructor has a rich background teaching students worldwide, helping thousands of candidates launch successful tech, engineering, design, and marketing careers.'}
+              </p>
+            </div>
+
+            <div className="mt-10">
+              <h2 className="text-2xl font-black text-gray-950">Student Reviews</h2>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {reviews.length > 0 ? (
+                  reviews.map((review) => (
+                    <article key={review._id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="grid h-10 w-10 place-items-center rounded-full bg-blue-600 font-bold text-white text-sm">
+                            {review.userId?.profileImage ? (
+                              <img src={review.userId.profileImage} alt={review.userId.name} className="h-full w-full rounded-full object-cover" />
+                            ) : (
+                              (review.userId?.name || 'S')[0]
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-sm text-gray-900">{review.userId?.name || 'Student'}</h4>
+                            <p className="text-xs text-gray-400">Verified Student</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 text-amber-500 font-bold text-sm">
+                          <Star size={15} className="fill-amber-500" />
+                          <span>{review.rating}.0</span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 leading-relaxed">&ldquo;{review.comment}&rdquo;</p>
+                    </article>
+                  ))
+                ) : (
+                  <div className="col-span-2 rounded-2xl border border-gray-200 bg-gray-50 p-8 text-center text-gray-500 text-sm">
+                    No student reviews posted yet for this course. Enrolled students can rate and review from their learning dashboard.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <aside className="h-fit rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <img src={thumbnail} alt={course.title} className="h-56 w-full rounded-xl object-cover" />
+            <div className="mt-5 flex items-center justify-between">
+              <strong className="text-3xl font-black text-gray-950">{formatCurrency(course.price)}</strong>
+              <span className="text-sm text-gray-500">Lifetime access</span>
+            </div>
+            <p className="mt-4 text-sm text-gray-600">Instructor: <strong>{instructorName || 'SkillShare Instructor'}</strong></p>
+
+            {enrollError && (
+              <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-bold text-red-600">
+                {enrollError}
+              </p>
+            )}
+
+            {isEnrolled ? (
+              <Link
+                to={`/dashboard/student/learning/${courseIdForLinks}`}
+                className="mt-5 inline-flex w-full justify-center rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 text-center"
+              >
+                Continue Learning
+              </Link>
+            ) : (
+              <button
+                onClick={handleEnrollment}
+                disabled={enrolling}
+                className="mt-5 inline-flex w-full justify-center rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {enrolling ? 'Enrolling...' : course.price > 0 ? 'Buy Course' : 'Enroll in Course'}
+              </button>
+            )}
+          </aside>
+        </div>
+
+        <div className="mt-16">
+          <h2 className="text-2xl font-black text-gray-950">Related Courses</h2>
+          <div className="mt-5 grid gap-5 md:grid-cols-3">
+            {relatedCourses.map((item) => <CourseCard key={item.id} course={item} />)}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

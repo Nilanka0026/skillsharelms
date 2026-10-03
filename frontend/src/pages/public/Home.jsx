@@ -1,0 +1,239 @@
+import { useEffect, useState, createElement } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, CheckCircle2, Search } from 'lucide-react';
+import { CourseCard } from '../../components/common/CourseCard.jsx';
+import { ReviewCard } from '../../components/common/ReviewCard.jsx';
+import { categories, faqs, stats, testimonials } from '../../data/platformData.js';
+import { courseApi } from '../../services/api.js';
+import apiClient from '../../services/apiClient.js';
+
+export function Home() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [featuredCourses, setFeaturedCourses] = useState([]);
+  const [topTeachers, setTopTeachers] = useState([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    courseApi.list()
+      .then((data) => {
+        setFeaturedCourses(data);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch featured courses:', err);
+      })
+      .finally(() => setLoadingCourses(false));
+
+    apiClient.get('/teachers')
+      .then((data) => setTopTeachers(data.slice(0, 3)))
+      .catch(() => {});
+  }, []);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/courses?search=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      navigate('/courses');
+    }
+  };
+
+  return (
+    <>
+      <section 
+        className="relative overflow-hidden py-20 sm:py-24 lg:py-32 transition-colors duration-300"
+        style={{ backgroundColor: '#0b0f19' }}
+      >
+        {/* Background Video */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover opacity-45"
+        >
+          <source src="/hero-bg.mp4" type="video/mp4" />
+        </video>
+        
+        {/* Overlay to ensure high contrast and text readability */}
+        <div 
+          className="absolute inset-0" 
+          style={{ backgroundImage: 'linear-gradient(to top, #0b0f19 0%, rgba(11, 15, 25, 0.5) 50%, rgba(11, 15, 25, 0.8) 100%)' }}
+        />
+
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl">
+            <span 
+              className="rounded-full border px-4 py-2 text-sm font-bold animate-pulse inline-block"
+              style={{ 
+                backgroundColor: 'rgba(59, 130, 246, 0.2)', 
+                borderColor: 'rgba(59, 130, 246, 0.3)', 
+                color: '#60a5fa' 
+              }}
+            >
+              Modern e-learning marketplace
+            </span>
+            <h1 
+              className="mt-6 text-5xl font-black tracking-tight sm:text-6xl"
+              style={{ color: '#ffffff' }}
+            >
+              Learn practical skills from top instructors.
+            </h1>
+            <p 
+              className="mt-6 text-lg leading-8"
+              style={{ color: '#d1d5db' }}
+            >
+              The Engineering Skill Sharing Platform connects students and staff across all engineering departments to learn, teach, and grow together.
+            </p>
+
+            {/* Homepage Search Bar */}
+            <form onSubmit={handleSearchSubmit} className="mt-8 flex flex-col sm:flex-row gap-3 max-w-2xl">
+              <div className="relative flex-1">
+                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search courses by keyword, topic, or teacher..."
+                  className="w-full rounded-xl border border-gray-700 bg-gray-900/90 py-3.5 pl-12 pr-4 text-white outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+                />
+              </div>
+              <button
+                type="submit"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 font-bold text-white hover:bg-blue-700 transition duration-200 shadow-lg cursor-pointer"
+              >
+                Search Courses
+              </button>
+            </form>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link 
+                to="/courses" 
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors duration-200"
+                style={{ color: '#ffffff' }}
+              >
+                Browse All Courses <ArrowRight size={16} style={{ color: '#ffffff' }} />
+              </Link>
+              <Link 
+                to="/register" 
+                className="inline-flex min-h-11 items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors duration-200 hover:bg-[rgba(255,255,255,0.2)]"
+                style={{ 
+                  border: '1px solid rgba(255, 255, 255, 0.2)', 
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+                  color: '#ffffff' 
+                }}
+              >
+                Become an Instructor
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 transition-colors duration-300">
+        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-8 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
+          {stats.map(({ icon: Icon, label, value }) => (
+            <article key={label} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm transition-colors">
+              {createElement(Icon, { size: 22, className: 'text-blue-600' })}
+              <strong className="mt-3 block text-2xl font-black text-gray-950 dark:text-white">{value}</strong>
+              <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <Section title="Featured Courses" action="/courses">
+        {loadingCourses ? (
+          <div className="py-12 text-center text-sm font-semibold text-gray-500">Loading actual courses...</div>
+        ) : featuredCourses.length === 0 ? (
+          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-8 text-center text-gray-500">
+            No published courses available right now. Check back soon!
+          </div>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {featuredCourses.slice(0, 6).map((course) => (
+              <CourseCard key={course._id || course.id} course={course} />
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <section className="bg-gray-50 dark:bg-gray-900/30 transition-colors duration-300">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-black text-gray-950 dark:text-white">Categories</h2>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {categories.map((category) => (
+              <Link key={category} to={`/courses?category=${category}`} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+                <CheckCircle2 size={22} className="text-blue-600" />
+                <h3 className="mt-4 text-lg font-black text-gray-950 dark:text-white">{category}</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Explore curated courses and projects.</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {topTeachers.length > 0 && (
+        <Section title="Top Instructors" action="/teachers">
+          <div className="grid gap-5 md:grid-cols-3">
+            {topTeachers.map((teacher) => (
+              <article key={teacher._id} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-blue-600 text-xl font-black text-white">
+                    {teacher.profileImage ? (
+                      <img src={teacher.profileImage} alt={teacher.name} className="h-full w-full rounded-2xl object-cover" />
+                    ) : (
+                      teacher.name[0]
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-black text-gray-950 dark:text-white">{teacher.name}</h3>
+                    <p className="text-xs font-bold text-blue-600 dark:text-blue-400">{teacher.experience || 'Educator'}</p>
+                  </div>
+                </div>
+                <p className="mt-4 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">{teacher.bio || 'Experienced software professional and teacher.'}</p>
+                <Link to={`/teachers/${teacher._id}`} className="mt-4 inline-block text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                  View Profile &rarr;
+                </Link>
+              </article>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      <section className="bg-gray-50 dark:bg-gray-900/30 transition-colors duration-300">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-black text-gray-950 dark:text-white">Testimonials</h2>
+          <div className="mt-8 grid gap-5 md:grid-cols-3">
+            {testimonials.map((item) => <ReviewCard key={item.name} name={item.name} text={item.text} />)}
+          </div>
+        </div>
+      </section>
+
+      <Section title="FAQ">
+        <div className="grid gap-3">
+          {faqs.map(([question, answer]) => (
+            <details key={question} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm transition-colors duration-300">
+              <summary className="cursor-pointer font-black text-gray-950 dark:text-white">{question}</summary>
+              <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{answer}</p>
+            </details>
+          ))}
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function Section({ action, children, title }) {
+  return (
+    <section className="bg-white dark:bg-gray-950 transition-colors duration-300">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <h2 className="text-3xl font-black text-gray-950 dark:text-white">{title}</h2>
+          {action && <Link to={action} className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">View all</Link>}
+        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
